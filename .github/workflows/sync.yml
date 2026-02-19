@@ -3,7 +3,7 @@ name: Reachmee → Webflow Sync
 on:
   schedule:
     # Kör var 10:e minut
-    - cron: "*/10 * * * *" 
+    # - cron: "*/10 * * * *" 
   workflow_dispatch:
     # Tillåter manuell körning via GitHub UI
 
