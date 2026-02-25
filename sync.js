@@ -7,6 +7,8 @@
  * - Arkiverar jobb som försvunnit från flödet
  * - Publicerar alla ändringar automatiskt
  * - Matchar kontaktpersoner mot Medarbetare-collectionen via e-post
+ * - Sätter "AD updated" till dagens datum när en förändring upptäcks
+ * - Ingress uppdateras aldrig vid uppdateringar, bara vid skapande
  */
 
 const REACHMEE_FEED_URL =
@@ -18,13 +20,13 @@ const WEBFLOW_STAFF_COLLECTION_ID = "698efc0f2ce6e1819bf28cc7";
 const WEBFLOW_API_BASE = "https://api.webflow.com/v2";
 
 // Fält som jämförs för att avgöra om ett jobb ska uppdateras
+// Ingress ingår inte här eftersom den aldrig ska uppdateras
 const FIELDS_TO_COMPARE = [
   "name",
   "beskrivning-2",
   "company",
   "omrade",
   "kategori",
-  "ingress",
   "lank-till-reachmee",
   "kontaktperson-vem",
   "kontaktperson-vem-2",
@@ -75,8 +77,8 @@ function extractIngress(html) {
 }
 
 /**
- * Bygger Webflow fieldData från ett Reachmee-jobb.
- * staffByEmail är en Map med e-post → Webflow item-ID för Medarbetare.
+ * Bygger bas-fieldData från ett Reachmee-jobb (utan ingress).
+ * Används både vid skapande och uppdatering.
  */
 function buildFieldData(job, staffByEmail) {
   const contact1 = job.contact_persons?.[0] || null;
@@ -106,7 +108,6 @@ function buildFieldData(job, staffByEmail) {
     company: org,
     omrade: area,
     kategori: job.occupation_area !== "[Annat...]" ? job.occupation_area : null,
-    ingress: extractIngress(job.description),
     "lank-till-reachmee": job.link || null,
     datum: job.publishing_date
       ? new Date(job.publishing_date).toISOString()
@@ -283,22 +284,27 @@ async function sync() {
   let unchanged = 0;
   let archived = 0;
 
+  const now = new Date().toISOString();
+
   // 6. Loopa igenom Reachmee-jobben
   for (const job of reachmeeJobs) {
     const fieldData = buildFieldData(job, staffByEmail);
     const existing = webflowByAdId.get(job.ad_id);
 
     if (!existing) {
-      // Nytt jobb – skapa
+      // Nytt jobb – lägg till ingress och skapa
       console.log(`➕ Skapar: "${job.title}" (ad_id: ${job.ad_id})`);
       fieldData.slug = generateSlug(job);
+      fieldData.ingress = extractIngress(job.description);
       const createdItem = await createItem(fieldData);
       toPublish.push(createdItem.id);
       created++;
     } else {
       // Befintligt jobb – kolla om det ändrats
+      // Ingress ingår inte i jämförelsen och skickas inte med vid uppdatering
       if (hasChanges(fieldData, existing.fieldData)) {
         console.log(`✏️  Uppdaterar: "${job.title}" (ad_id: ${job.ad_id})`);
+        fieldData["ad-updated"] = now;
         await updateItem(existing.id, fieldData);
         toPublish.push(existing.id);
         updated++;
