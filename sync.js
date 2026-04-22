@@ -10,7 +10,7 @@
  * - Sätter "AD updated" till dagens datum när en förändring upptäcks
  * - Ingress uppdateras aldrig vid uppdateringar, bara vid skapande
  */
-
+/*
 const REACHMEE_FEED_URL =
   "https://site201.reachmee.com/api/public/v1/feed/6?lang=SE&customer=vem&format=json&feed_key=psf7junkfp";
 
